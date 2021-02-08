@@ -29,6 +29,67 @@ const (
 	esType  = "doc"
 )
 
+var mapping = `
+{
+    "mappings": {
+      "doc": {
+        "properties": {
+          "email_id": {
+            "type": "text",
+            "fields": {
+              "keyword": {
+                "type": "keyword",
+                "ignore_above": 256
+              }
+            }
+          },
+          "first_name": {
+            "type": "text",
+            "fields": {
+              "keyword": {
+                "type": "keyword",
+                "ignore_above": 256
+              }
+            }
+          },
+          "id": {
+            "type": "text",
+            "fields": {
+              "keyword": {
+                "type": "keyword",
+                "ignore_above": 256
+              }
+            }
+          },
+          "last_name": {
+            "type": "text",
+            "fields": {
+              "keyword": {
+                "type": "keyword",
+                "ignore_above": 256
+              }
+            }
+          },
+          "place": {
+            "type": "text",
+            "fields": {
+              "keyword": {
+                "type": "keyword",
+                "ignore_above": 256
+              }
+            }
+          }
+        }
+      }
+    },
+    "settings": {
+      "index": {
+        "number_of_shards": "5",
+        "number_of_replicas": "1"
+      }
+    }
+  }`
+
 func AddEmployeeInfo(response http.ResponseWriter, request *http.Request) {
 	response.Header().Set("content-type", "application/json")
 	var employee Employee
@@ -108,7 +169,30 @@ func DeleteEmployee(response http.ResponseWriter, request *http.Request) {
 	json.NewEncoder(response).Encode("Success")
 }
 
+func CheckIndexExists() {
+	ctx := context.Background()
+	exists, err := client.IndexExists(esIndex).Do(ctx)
+	if err != nil {
+		log.Fatal(err)
+		return
+	}
+	if !exists {
+		resp, err := client.CreateIndex(esIndex).BodyString(mapping).Do(ctx)
+		if err != nil {
+			log.Fatal(err)
+			return
+		}
+		if !resp.Acknowledged {
+			errors.New("CreateIndex was not acknowledged. Check that timeout value is correct.")
+			log.Fatalln(err)
+			return
+		}
+		log.Println("successfully created index")
+	}
+}
+
 func main() {
+	log.Print("application has started")
 	err := godotenv.Load()
 	if err != nil {
 		log.Fatalln(err)
@@ -119,8 +203,8 @@ func main() {
 	if err != nil {
 		log.Fatalln(err)
 	}
-	log.Print("application has started")
 	client = esClient
+	CheckIndexExists()
 	router := mux.NewRouter()
 	router.HandleFunc("/employee", AddEmployeeInfo).Methods("POST")
 	router.HandleFunc("/employees", GetEmployeesList).Methods("GET")
